@@ -66,4 +66,71 @@
 </head>
 <body>
   <h1>Upload Tenant CSV</h1>
-  <input type="file" id="csvInput" accept=".
+  <input type="file" id="csvInput" accept=".csv" />
+  <button onclick="handleUpload()">Generate Insights</button>
+  <div id="output"></div>
+
+  <script>
+    async function handleUpload() {
+      const fileInput = document.getElementById('csvInput');
+      const output = document.getElementById('output');
+      const file = fileInput.files[0];
+      output.innerHTML = "";
+
+      if (!file) {
+        output.innerHTML = "<p class='error'>Please select a CSV file.</p>";
+        return;
+      }
+
+      const text = await file.text();
+
+      try {
+        const response = await fetch("https://zv54onyhgk.execute-api.us-west-1.amazonaws.com/prod/insight", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ csv: text })
+        });
+
+        const raw = await response.json();
+
+        // Attempt to extract valid JSON from the response body string
+        const bodyText = raw.body;
+
+        // Try to match the JSON block at the end of the string
+        const jsonMatch = bodyText.match(/\[\s*{[\s\S]*}\s*\]/);
+
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          renderSimpleCards(parsed);
+        } else {
+          output.innerHTML = `<p class="error">Could not parse insights JSON from response.</p><div class="json-preview">${bodyText}</div>`;
+        }
+
+      } catch (err) {
+        output.innerHTML = `<p class='error'>Error: ${err.message}</p>`;
+      }
+    }
+
+    function renderSimpleCards(tenants) {
+      const output = document.getElementById('output');
+      output.innerHTML = "";
+
+      tenants.forEach(tenant => {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        card.innerHTML = `
+          <h3>${tenant.tenant_name}</h3>
+          <p><strong>Score:</strong> ${tenant.tenant_score}</p>
+          <p><strong>Renewal Recommendation:</strong> ${tenant.renewal_recommendation}</p>
+          <p><strong>Turnover Risk:</strong> ${tenant.turnover_risk}</p>
+          <p><strong>Predicted Delinquency:</strong> ${tenant.predicted_delinquency}</p>
+          <p><strong>Property:</strong> ${tenant.property}</p>
+        `;
+
+        output.appendChild(card);
+      });
+    }
+  </script>
+</body>
+</html>
